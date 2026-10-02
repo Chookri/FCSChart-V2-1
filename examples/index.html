@@ -306,11 +306,9 @@
                 const engine = chart && chart.engine;
                 if (!engine) return;
 
-                // Disable Auto Scale internally only when manual price zoom starts.
-                disableManualScaleLocks();
-
-                // The A/L/% controls live under the price scale.
-                // Only deactivate the Auto Scale (A) control.
+                // A is display-only for this visual state.
+                // Do not change the FCS Auto Scale function/state here.
+                // Only deactivate the Auto Scale (A) display.
                 const candidates = engine.container
                     ? engine.container.querySelectorAll('button, [role="button"]')
                     : [];
@@ -323,11 +321,35 @@
                     ].join(' ').trim();
 
                     if (label === 'A' || /^Auto\s*Scale$/i.test(label)) {
-                        el.classList.remove('active', 'selected', 'pressed');
+                        el.classList.add('tradigy-scale-display-inactive');
                         el.setAttribute('aria-pressed', 'false');
-                        el.style.color = '#000';
                     }
                 });
+            }
+
+            function bindScaleDisplayClick() {
+                if (!parent || parent.dataset.tradigyScaleDisplayBound === '1') return true;
+
+                parent.addEventListener('click', (event) => {
+                    const target = event.target;
+                    if (!target || !target.closest) return;
+
+                    const button = target.closest('button, [role="button"]');
+                    if (!button) return;
+
+                    const label = [
+                        button.getAttribute('aria-label') || '',
+                        button.getAttribute('title') || '',
+                        button.textContent || ''
+                    ].join(' ').trim();
+
+                    if (label === 'A' || /^Auto\s*Scale$/i.test(label)) {
+                        button.classList.remove('tradigy-scale-display-inactive');
+                    }
+                }, true);
+
+                parent.dataset.tradigyScaleDisplayBound = '1';
+                return true;
             }
 
             function deactivateAutoScaleFromPriceScaleWheel(event) {
@@ -416,6 +438,8 @@
 
                 return true;
             }
+
+            bindScaleDisplayClick();
 
             if (!bindWheel()) {
                 const observer = new MutationObserver(() => {
