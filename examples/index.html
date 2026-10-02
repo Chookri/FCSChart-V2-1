@@ -303,44 +303,43 @@
             }
 
             function deactivateScaleModes() {
-                const engine = chart && chart.engine;
-                if (!engine) return;
+                const chartInstance = chart;
+                if (!chartInstance) return;
 
-                disableManualScaleLocks();
+                // Use the chart's own toggle methods so state, UI manager,
+                // and A/L button state remain synchronized.
+                if (chartInstance.autoScale && typeof chartInstance.toggleAutoScale === 'function') {
+                    chartInstance.toggleAutoScale();
+                }
+                if (chartInstance.logScale && typeof chartInstance.toggleLogScale === 'function') {
+                    chartInstance.toggleLogScale();
+                }
 
-                // Vertical/manual price zoom disables both A and L.
-                engine.autoScale = false;
-                engine.logScale = false;
-
-                const candidates = engine.container
-                    ? engine.container.querySelectorAll('button, [role="button"]')
-                    : [];
-
-                candidates.forEach((el) => {
-                    const label = [
-                        el.getAttribute('aria-label') || '',
-                        el.getAttribute('title') || '',
-                        el.textContent || ''
-                    ].join(' ').trim();
-
-                    if (
-                        label === 'A' ||
-                        /^Auto\s*Scale$/i.test(label) ||
-                        label === 'L' ||
-                        /Logarithmic scale/i.test(label)
-                    ) {
-                        el.classList.remove('active', 'selected', 'pressed');
-                        el.setAttribute('aria-pressed', 'false');
-                        el.style.removeProperty('color');
-                    }
-                });
-
-                if (typeof engine.updatePriceScaleButtons === 'function') {
-                    engine.updatePriceScaleButtons();
+                if (typeof chartInstance.updatePriceScaleButtons === 'function') {
+                    chartInstance.updatePriceScaleButtons();
                 }
             }
 
             function deactivateAutoScaleFromPriceScaleWheel(event) {
+                const engine = chart && chart.engine;
+                const canvas = engine && engine.overlayCanvas;
+                if (!engine || !canvas) return false;
+
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const priceAxisWidth = Number(engine.priceAxisWidth) || 0;
+
+                // The FCS price scale is rendered at the right edge of the
+                // overlay canvas; use geometry instead of DOM selectors.
+                const onPriceScale = priceAxisWidth > 0 && x >= rect.width - priceAxisWidth;
+                if (onPriceScale) {
+                    deactivateScaleModes();
+                }
+
+                return onPriceScale;
+            }
+
+
                 const target = event.target;
                 if (!target || !target.closest) return;
 
@@ -400,8 +399,7 @@
                 event.preventDefault();
                 event.stopPropagation();
 
-                // Price-scale wheel = manual scale control, so Auto Scale (A)
-                // becomes inactive immediately. Normal chart wheel remains scroll.
+                // Price-scale wheel deactivates A/L immediately; chart wheel does not.
                 deactivateAutoScaleFromPriceScaleWheel(event);
 
                 if (event.ctrlKey) {
