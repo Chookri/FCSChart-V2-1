@@ -237,33 +237,80 @@
         // A / L are mutually exclusive when activating a scale mode.
         // Pressing the active button again leaves both modes inactive.
         // ============================================================
+        let scaleModesLockedInactive = false;
+
         (function setupScaleModeButtonBehavior() {
             const autoBtn = chart && chart.priceScaleAutoBtn;
             const logBtn = chart && chart.priceScaleLogBtn;
             if (!autoBtn || !logBtn || chart.__tradigyScaleModeBound) return;
 
+            function renderScaleModeButtons() {
+                const engineAutoScale = chart && chart.engine
+                    ? !!chart.engine.autoScale
+                    : !!chart.autoScale;
+                const autoActive = !scaleModesLockedInactive && engineAutoScale;
+                const logActive = !scaleModesLockedInactive && !!chart.logScale;
+                const toggleContainer =
+                    autoBtn.closest('.fcsapi-price-scale-toggles') ||
+                    autoBtn.parentElement?.parentElement;
+
+                if (toggleContainer) {
+                    toggleContainer.classList.toggle(
+                        'scale-modes-locked-inactive',
+                        scaleModesLockedInactive
+                    );
+                }
+
+                autoBtn.classList.toggle('active', autoActive);
+                logBtn.classList.toggle('active', logActive);
+                autoBtn.setAttribute('aria-pressed', autoActive ? 'true' : 'false');
+                logBtn.setAttribute('aria-pressed', logActive ? 'true' : 'false');
+            }
+
             function syncScaleModeState() {
-                if (chart.logScale) {
+                if (scaleModesLockedInactive) {
+                    if (chart.engine) {
+                        chart.engine.__tradigyScaleModesLockedInactive = true;
+                        chart.engine.autoScale = false;
+                        if (chart.engine.options) chart.engine.options.autoScale = false;
+                        if (chart.engine.uiManager && 'autoScale' in chart.engine.uiManager) {
+                            chart.engine.uiManager.autoScale = false;
+                        }
+                        if (typeof chart.engine.updatePriceScaleButtons === 'function') {
+                            chart.engine.updatePriceScaleButtons();
+                        }
+                    }
                     chart.autoScale = false;
-                } else if (chart.autoScale) {
+                    chart.logScale = false;
+                    renderScaleModeButtons();
+                    return;
+                }
+
+                const engineAutoScale = chart && chart.engine
+                    ? !!chart.engine.autoScale
+                    : !!chart.autoScale;
+
+                if (chart.logScale) {
+                    if (chart.engine) chart.engine.autoScale = false;
+                    chart.autoScale = false;
+                } else if (engineAutoScale) {
                     chart.logScale = false;
                 }
 
-                // FCS updates the internal state, but its button-state updater
-                // is not exposed on the chart instance. Sync the visible DOM state here.
-                autoBtn.classList.toggle('active', !!chart.autoScale);
-                logBtn.classList.toggle('active', !!chart.logScale);
-                autoBtn.setAttribute('aria-pressed', chart.autoScale ? 'true' : 'false');
-                logBtn.setAttribute('aria-pressed', chart.logScale ? 'true' : 'false');
+                renderScaleModeButtons();
             }
 
-            // Run after FCS's own click handler/UI-manager update has completed.
-            function syncScaleModeStateAfterFcs() {
+            function unlockScaleModesByUserClick() {
+                scaleModesLockedInactive = false;
+                if (chart.engine) {
+                    chart.engine.__tradigyScaleModesLockedInactive = false;
+                }
                 setTimeout(syncScaleModeState, 0);
             }
 
-            autoBtn.addEventListener('click', syncScaleModeStateAfterFcs);
-            logBtn.addEventListener('click', syncScaleModeStateAfterFcs);
+            // Clear the native lock before FCS handles the direct user click.
+            autoBtn.addEventListener('click', unlockScaleModesByUserClick, true);
+            logBtn.addEventListener('click', unlockScaleModesByUserClick, true);
 
             // FCS may touch the button classes again during its own UI update.
             // Keep the visible A/L state synchronized with the chart state.
@@ -347,11 +394,24 @@
                 const chartInstance = chart;
                 if (!chartInstance) return;
 
-                // Use the chart's own toggle methods so state, UI manager,
-                // and A/L button state remain synchronized.
+                // Use the chart's own toggle method, then explicitly
+                // synchronize the engine state used by price-scale interaction.
                 if (chartInstance.autoScale && typeof chartInstance.toggleAutoScale === 'function') {
                     chartInstance.toggleAutoScale();
                 }
+                if (chartInstance.engine) {
+                    chartInstance.engine.__tradigyScaleModesLockedInactive =
+                        scaleModesLockedInactive;
+                    chartInstance.engine.autoScale = false;
+                    if (chartInstance.engine.options) {
+                        chartInstance.engine.options.autoScale = false;
+                    }
+                    if (chartInstance.engine.uiManager &&
+                        'autoScale' in chartInstance.engine.uiManager) {
+                        chartInstance.engine.uiManager.autoScale = false;
+                    }
+                }
+                chartInstance.autoScale = false;
                 // FCS keeps log-scale state on the chart instance; its
                 // obfuscated toggle method is not a stable public method.
                 chartInstance.logScale = false;
@@ -386,7 +446,21 @@
                 const engine = chart && chart.engine;
                 if (!engine) return;
 
+                scaleModesLockedInactive = true;
+                if (chart && chart.engine) {
+                    chart.engine.__tradigyScaleModesLockedInactive = true;
+                }
                 deactivateScaleModes();
+                const autoBtn = chart && chart.priceScaleAutoBtn;
+                const logBtn = chart && chart.priceScaleLogBtn;
+                if (autoBtn) {
+                    autoBtn.classList.remove('active');
+                    autoBtn.setAttribute('aria-pressed', 'false');
+                }
+                if (logBtn) {
+                    logBtn.classList.remove('active');
+                    logBtn.setAttribute('aria-pressed', 'false');
+                }
 
                 const range = engine.priceRange;
                 if (!range) return;
@@ -474,6 +548,41 @@
             console.log('Socket status:', chart.engine.socketManager?.getConnectionStatus());
             console.log('Theme:', chart.engine.themeManager?.currentTheme);
         }, 2000);
+
+        // Temporary diagnostic: do not change chart behavior.
+        // Captures the first 10 seconds so we can distinguish data loss
+        // from a canvas/layout/rendering failure.
+        (function startChartHealthDiagnostic() {
+            let previous = null;
+            let elapsed = 0;
+            const timer = setInterval(() => {
+                elapsed += 1;
+                const engine = chart && chart.engine;
+                if (!engine) return;
+                const container = engine.container;
+                const canvas = engine.canvas;
+                const overlay = engine.overlayCanvas;
+                const state = {
+                    sec: elapsed,
+                    data: Array.isArray(engine.data) ? engine.data.length : null,
+                    sourceCandles: engine.sourceCandles?.size ?? null,
+                    autoScale: engine.autoScale,
+                    engineAutoScale: engine.autoScale,
+                    container: container ? [container.clientWidth, container.clientHeight] : null,
+                    canvas: canvas ? [canvas.width, canvas.height] : null,
+                    overlay: overlay ? [overlay.width, overlay.height] : null,
+                    symbol: engine.currentSymbol,
+                    period: engine.currentPeriod,
+                    socket: engine.socketManager?.getConnectionStatus?.()
+                };
+                const signature = JSON.stringify(state);
+                if (signature !== previous) {
+                    console.log('[TRADIGY_HEALTH]', state);
+                    previous = signature;
+                }
+                if (elapsed >= 10) clearInterval(timer);
+            }, 1000);
+        })();
 
     </script>
 </body>
