@@ -549,6 +549,41 @@
             console.log('Theme:', chart.engine.themeManager?.currentTheme);
         }, 2000);
 
+        // Temporary diagnostic: do not change chart behavior.
+        // Captures the first 10 seconds so we can distinguish data loss
+        // from a canvas/layout/rendering failure.
+        (function startChartHealthDiagnostic() {
+            let previous = null;
+            let elapsed = 0;
+            const timer = setInterval(() => {
+                elapsed += 1;
+                const engine = chart && chart.engine;
+                if (!engine) return;
+                const container = engine.container;
+                const canvas = engine.canvas;
+                const overlay = engine.overlayCanvas;
+                const state = {
+                    sec: elapsed,
+                    data: Array.isArray(engine.data) ? engine.data.length : null,
+                    sourceCandles: engine.sourceCandles?.size ?? null,
+                    autoScale: engine.autoScale,
+                    engineAutoScale: engine.autoScale,
+                    container: container ? [container.clientWidth, container.clientHeight] : null,
+                    canvas: canvas ? [canvas.width, canvas.height] : null,
+                    overlay: overlay ? [overlay.width, overlay.height] : null,
+                    symbol: engine.currentSymbol,
+                    period: engine.currentPeriod,
+                    socket: engine.socketManager?.getConnectionStatus?.()
+                };
+                const signature = JSON.stringify(state);
+                if (signature !== previous) {
+                    console.log('[TRADIGY_HEALTH]', state);
+                    previous = signature;
+                }
+                if (elapsed >= 10) clearInterval(timer);
+            }, 1000);
+        })();
+
     </script>
 </body>
 </html>
