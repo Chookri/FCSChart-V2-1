@@ -264,6 +264,13 @@
 
             autoBtn.addEventListener('click', syncScaleModeStateAfterFcs);
             logBtn.addEventListener('click', syncScaleModeStateAfterFcs);
+
+            // FCS may touch the button classes again during its own UI update.
+            // Keep the visible A/L state synchronized with the chart state.
+            const scaleModeObserver = new MutationObserver(syncScaleModeState);
+            scaleModeObserver.observe(autoBtn, { attributes: true, attributeFilter: ['class'] });
+            scaleModeObserver.observe(logBtn, { attributes: true, attributeFilter: ['class'] });
+
             chart.__tradigyScaleModeBound = true;
         })();
 
