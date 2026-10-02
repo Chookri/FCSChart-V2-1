@@ -249,9 +249,12 @@
                     chart.logScale = false;
                 }
 
-                if (typeof chart.updatePriceScaleButtons === 'function') {
-                    chart.updatePriceScaleButtons();
-                }
+                // FCS updates the internal state, but its button-state updater
+                // is not exposed on the chart instance. Sync the visible DOM state here.
+                autoBtn.classList.toggle('active', !!chart.autoScale);
+                logBtn.classList.toggle('active', !!chart.logScale);
+                autoBtn.setAttribute('aria-pressed', chart.autoScale ? 'true' : 'false');
+                logBtn.setAttribute('aria-pressed', chart.logScale ? 'true' : 'false');
             }
 
             // Run after FCS's own click handler/UI-manager update has completed.
