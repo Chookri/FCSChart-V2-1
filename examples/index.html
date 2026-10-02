@@ -247,7 +247,9 @@
             function renderScaleModeButtons() {
                 const autoActive = !scaleModesLockedInactive && !!chart.autoScale;
                 const logActive = !scaleModesLockedInactive && !!chart.logScale;
-                const toggleContainer = autoBtn.parentElement;
+                const toggleContainer =
+                    autoBtn.closest('.fcsapi-price-scale-toggles') ||
+                    autoBtn.parentElement?.parentElement;
 
                 if (toggleContainer) {
                     toggleContainer.classList.toggle(
