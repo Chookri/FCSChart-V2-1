@@ -234,6 +234,32 @@
         // chart.clearHorizontalLines();
 
         // ============================================================
+        // A / L are mutually exclusive when activating a scale mode.
+        // Pressing the active button again leaves both modes inactive.
+        // ============================================================
+        (function setupScaleModeButtonBehavior() {
+            const autoBtn = chart && chart.priceScaleAutoBtn;
+            const logBtn = chart && chart.priceScaleLogBtn;
+            if (!autoBtn || !logBtn || chart.__tradigyScaleModeBound) return;
+
+            function syncScaleModeState() {
+                if (chart.autoScale) {
+                    chart.logScale = false;
+                } else if (chart.logScale) {
+                    chart.autoScale = false;
+                }
+
+                if (typeof chart.updatePriceScaleButtons === 'function') {
+                    chart.updatePriceScaleButtons();
+                }
+            }
+
+            autoBtn.addEventListener('click', syncScaleModeState);
+            logBtn.addEventListener('click', syncScaleModeState);
+            chart.__tradigyScaleModeBound = true;
+        })();
+
+        // ============================================================
         // TRADIGY V2 MOUSE WHEEL CONTROLS
         // Wheel        = existing horizontal scroll
         // Ctrl + Wheel = horizontal zoom around chart center
