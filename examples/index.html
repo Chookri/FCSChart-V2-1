@@ -243,10 +243,10 @@
             if (!autoBtn || !logBtn || chart.__tradigyScaleModeBound) return;
 
             function syncScaleModeState() {
-                if (chart.autoScale) {
-                    chart.logScale = false;
-                } else if (chart.logScale) {
+                if (chart.logScale) {
                     chart.autoScale = false;
+                } else if (chart.autoScale) {
+                    chart.logScale = false;
                 }
 
                 if (typeof chart.updatePriceScaleButtons === 'function') {
