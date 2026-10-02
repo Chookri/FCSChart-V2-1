@@ -245,7 +245,10 @@
             if (!autoBtn || !logBtn || chart.__tradigyScaleModeBound) return;
 
             function renderScaleModeButtons() {
-                const autoActive = !scaleModesLockedInactive && !!chart.autoScale;
+                const engineAutoScale = chart && chart.engine
+                    ? !!chart.engine.autoScale
+                    : !!chart.autoScale;
+                const autoActive = !scaleModesLockedInactive && engineAutoScale;
                 const logActive = !scaleModesLockedInactive && !!chart.logScale;
                 const toggleContainer =
                     autoBtn.closest('.fcsapi-price-scale-toggles') ||
@@ -266,15 +269,21 @@
 
             function syncScaleModeState() {
                 if (scaleModesLockedInactive) {
+                    if (chart.engine) chart.engine.autoScale = false;
                     chart.autoScale = false;
                     chart.logScale = false;
                     renderScaleModeButtons();
                     return;
                 }
 
+                const engineAutoScale = chart && chart.engine
+                    ? !!chart.engine.autoScale
+                    : !!chart.autoScale;
+
                 if (chart.logScale) {
+                    if (chart.engine) chart.engine.autoScale = false;
                     chart.autoScale = false;
-                } else if (chart.autoScale) {
+                } else if (engineAutoScale) {
                     chart.logScale = false;
                 }
 
@@ -372,11 +381,15 @@
                 const chartInstance = chart;
                 if (!chartInstance) return;
 
-                // Use the chart's own toggle methods so state, UI manager,
-                // and A/L button state remain synchronized.
+                // Use the chart's own toggle method, then explicitly
+                // synchronize the engine state used by price-scale interaction.
                 if (chartInstance.autoScale && typeof chartInstance.toggleAutoScale === 'function') {
                     chartInstance.toggleAutoScale();
                 }
+                if (chartInstance.engine) {
+                    chartInstance.engine.autoScale = false;
+                }
+                chartInstance.autoScale = false;
                 // FCS keeps log-scale state on the chart instance; its
                 // obfuscated toggle method is not a stable public method.
                 chartInstance.logScale = false;
