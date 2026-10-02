@@ -234,6 +234,32 @@
         // chart.clearHorizontalLines();
 
         // ============================================================
+        // A / L are mutually exclusive when activating a scale mode.
+        // Pressing the active button again leaves both modes inactive.
+        // ============================================================
+        (function setupScaleModeButtonBehavior() {
+            const autoBtn = chart && chart.priceScaleAutoBtn;
+            const logBtn = chart && chart.priceScaleLogBtn;
+            if (!autoBtn || !logBtn || chart.__tradigyScaleModeBound) return;
+
+            function syncScaleModeState() {
+                if (chart.autoScale) {
+                    chart.logScale = false;
+                } else if (chart.logScale) {
+                    chart.autoScale = false;
+                }
+
+                if (typeof chart.updatePriceScaleButtons === 'function') {
+                    chart.updatePriceScaleButtons();
+                }
+            }
+
+            autoBtn.addEventListener('click', syncScaleModeState);
+            logBtn.addEventListener('click', syncScaleModeState);
+            chart.__tradigyScaleModeBound = true;
+        })();
+
+        // ============================================================
         // TRADIGY V2 MOUSE WHEEL CONTROLS
         // Wheel        = existing horizontal scroll
         // Ctrl + Wheel = horizontal zoom around chart center
@@ -303,59 +329,43 @@
             }
 
             function deactivateScaleModes() {
-                const engine = chart && chart.engine;
-                if (!engine) return;
+                const chartInstance = chart;
+                if (!chartInstance) return;
 
-                disableManualScaleLocks();
+                // Use the chart's own toggle methods so state, UI manager,
+                // and A/L button state remain synchronized.
+                if (chartInstance.autoScale && typeof chartInstance.toggleAutoScale === 'function') {
+                    chartInstance.toggleAutoScale();
+                }
+                // FCS keeps log-scale state on the chart instance; its
+                // obfuscated toggle method is not a stable public method.
+                chartInstance.logScale = false;
 
-                // Vertical/manual price zoom disables both A and L.
-                engine.autoScale = false;
-                engine.logScale = false;
-
-                const candidates = engine.container
-                    ? engine.container.querySelectorAll('button, [role="button"]')
-                    : [];
-
-                candidates.forEach((el) => {
-                    const label = [
-                        el.getAttribute('aria-label') || '',
-                        el.getAttribute('title') || '',
-                        el.textContent || ''
-                    ].join(' ').trim();
-
-                    if (
-                        label === 'A' ||
-                        /^Auto\s*Scale$/i.test(label) ||
-                        label === 'L' ||
-                        /Logarithmic scale/i.test(label)
-                    ) {
-                        el.classList.remove('active', 'selected', 'pressed');
-                        el.setAttribute('aria-pressed', 'false');
-                        el.style.removeProperty('color');
-                    }
-                });
-
-                if (typeof engine.updatePriceScaleButtons === 'function') {
-                    engine.updatePriceScaleButtons();
+                if (typeof chartInstance.updatePriceScaleButtons === 'function') {
+                    chartInstance.updatePriceScaleButtons();
                 }
             }
 
             function deactivateAutoScaleFromPriceScaleWheel(event) {
-                const target = event.target;
-                if (!target || !target.closest) return;
+                const engine = chart && chart.engine;
+                const canvas = engine && engine.overlayCanvas;
+                if (!engine || !canvas) return false;
 
-                // Only normal wheel over the price scale should trigger
-                // Auto Scale deactivation; Ctrl-wheel remains untouched.
-                const priceScale = target.closest(
-                    '[class*="price-scale"], [class*="priceScale"], ' +
-                    '[class*="price-axis"], [class*="priceAxis"], ' +
-                    '[data-price-scale], [data-price-axis]'
-                );
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const priceAxisWidth = Number(engine.priceAxisWidth) || 0;
 
-                if (priceScale) {
+                // The FCS price scale is rendered at the right edge of the
+                // overlay canvas; use geometry instead of DOM selectors.
+                const onPriceScale = priceAxisWidth > 0 && x >= rect.width - priceAxisWidth;
+                if (onPriceScale) {
                     deactivateScaleModes();
                 }
+
+                return onPriceScale;
             }
+
+
 
             function verticalZoom(factor) {
                 const engine = chart && chart.engine;
@@ -400,8 +410,7 @@
                 event.preventDefault();
                 event.stopPropagation();
 
-                // Price-scale wheel = manual scale control, so Auto Scale (A)
-                // becomes inactive immediately. Normal chart wheel remains scroll.
+                // Price-scale wheel deactivates A/L immediately; chart wheel does not.
                 deactivateAutoScaleFromPriceScaleWheel(event);
 
                 if (event.ctrlKey) {
