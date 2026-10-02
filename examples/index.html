@@ -302,15 +302,16 @@
                 }
             }
 
-            function deactivateAutoScaleButton() {
+            function deactivateScaleModes() {
                 const engine = chart && chart.engine;
                 if (!engine) return;
 
-                // Disable Auto Scale internally only when manual price zoom starts.
                 disableManualScaleLocks();
 
-                // The A/L/% controls live under the price scale.
-                // Only deactivate the Auto Scale (A) control.
+                // Vertical/manual price zoom disables both A and L.
+                engine.autoScale = false;
+                engine.logScale = false;
+
                 const candidates = engine.container
                     ? engine.container.querySelectorAll('button, [role="button"]')
                     : [];
@@ -322,12 +323,21 @@
                         el.textContent || ''
                     ].join(' ').trim();
 
-                    if (label === 'A' || /^Auto\s*Scale$/i.test(label)) {
+                    if (
+                        label === 'A' ||
+                        /^Auto\s*Scale$/i.test(label) ||
+                        label === 'L' ||
+                        /Logarithmic scale/i.test(label)
+                    ) {
                         el.classList.remove('active', 'selected', 'pressed');
                         el.setAttribute('aria-pressed', 'false');
-                        el.style.color = '#000';
+                        el.style.removeProperty('color');
                     }
                 });
+
+                if (typeof engine.updatePriceScaleButtons === 'function') {
+                    engine.updatePriceScaleButtons();
+                }
             }
 
             function deactivateAutoScaleFromPriceScaleWheel(event) {
@@ -343,7 +353,7 @@
                 );
 
                 if (priceScale) {
-                    deactivateAutoScaleButton();
+                    deactivateScaleModes();
                 }
             }
 
@@ -351,7 +361,7 @@
                 const engine = chart && chart.engine;
                 if (!engine) return;
 
-                deactivateAutoScaleButton();
+                deactivateScaleModes();
 
                 const range = engine.priceRange;
                 if (!range) return;
