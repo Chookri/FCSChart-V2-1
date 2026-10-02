@@ -237,12 +237,12 @@
         // A / L are mutually exclusive when activating a scale mode.
         // Pressing the active button again leaves both modes inactive.
         // ============================================================
+        let scaleModesLockedInactive = false;
+
         (function setupScaleModeButtonBehavior() {
             const autoBtn = chart && chart.priceScaleAutoBtn;
             const logBtn = chart && chart.priceScaleLogBtn;
             if (!autoBtn || !logBtn || chart.__tradigyScaleModeBound) return;
-
-            let scaleModesLockedInactive = false;
 
             function renderScaleModeButtons() {
                 const autoActive = !scaleModesLockedInactive && !!chart.autoScale;
@@ -403,7 +403,16 @@
 
                 scaleModesLockedInactive = true;
                 deactivateScaleModes();
-                renderScaleModeButtons();
+                const autoBtn = chart && chart.priceScaleAutoBtn;
+                const logBtn = chart && chart.priceScaleLogBtn;
+                if (autoBtn) {
+                    autoBtn.classList.remove('active');
+                    autoBtn.setAttribute('aria-pressed', 'false');
+                }
+                if (logBtn) {
+                    logBtn.classList.remove('active');
+                    logBtn.setAttribute('aria-pressed', 'false');
+                }
 
                 const range = engine.priceRange;
                 if (!range) return;
