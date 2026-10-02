@@ -254,8 +254,13 @@
                 }
             }
 
-            autoBtn.addEventListener('click', syncScaleModeState);
-            logBtn.addEventListener('click', syncScaleModeState);
+            // Run after FCS's own click handler/UI-manager update has completed.
+            function syncScaleModeStateAfterFcs() {
+                setTimeout(syncScaleModeState, 0);
+            }
+
+            autoBtn.addEventListener('click', syncScaleModeStateAfterFcs);
+            logBtn.addEventListener('click', syncScaleModeStateAfterFcs);
             chart.__tradigyScaleModeBound = true;
         })();
 
