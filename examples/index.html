@@ -311,9 +311,9 @@
                 if (chartInstance.autoScale && typeof chartInstance.toggleAutoScale === 'function') {
                     chartInstance.toggleAutoScale();
                 }
-                if (chartInstance.logScale && typeof chartInstance.toggleLogScale === 'function') {
-                    chartInstance.toggleLogScale();
-                }
+                // FCS keeps log-scale state on the chart instance; its
+                // obfuscated toggle method is not a stable public method.
+                chartInstance.logScale = false;
 
                 if (typeof chartInstance.updatePriceScaleButtons === 'function') {
                     chartInstance.updatePriceScaleButtons();
