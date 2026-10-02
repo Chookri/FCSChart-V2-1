@@ -247,6 +247,14 @@
             function renderScaleModeButtons() {
                 const autoActive = !scaleModesLockedInactive && !!chart.autoScale;
                 const logActive = !scaleModesLockedInactive && !!chart.logScale;
+                const toggleContainer = autoBtn.parentElement;
+
+                if (toggleContainer) {
+                    toggleContainer.classList.toggle(
+                        'scale-modes-locked-inactive',
+                        scaleModesLockedInactive
+                    );
+                }
 
                 autoBtn.classList.toggle('active', autoActive);
                 logBtn.classList.toggle('active', logActive);
