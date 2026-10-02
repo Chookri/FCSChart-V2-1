@@ -242,28 +242,43 @@
             const logBtn = chart && chart.priceScaleLogBtn;
             if (!autoBtn || !logBtn || chart.__tradigyScaleModeBound) return;
 
+            let scaleModesLockedInactive = false;
+
+            function renderScaleModeButtons() {
+                const autoActive = !scaleModesLockedInactive && !!chart.autoScale;
+                const logActive = !scaleModesLockedInactive && !!chart.logScale;
+
+                autoBtn.classList.toggle('active', autoActive);
+                logBtn.classList.toggle('active', logActive);
+                autoBtn.setAttribute('aria-pressed', autoActive ? 'true' : 'false');
+                logBtn.setAttribute('aria-pressed', logActive ? 'true' : 'false');
+            }
+
             function syncScaleModeState() {
+                if (scaleModesLockedInactive) {
+                    chart.autoScale = false;
+                    chart.logScale = false;
+                    renderScaleModeButtons();
+                    return;
+                }
+
                 if (chart.logScale) {
                     chart.autoScale = false;
                 } else if (chart.autoScale) {
                     chart.logScale = false;
                 }
 
-                // FCS updates the internal state, but its button-state updater
-                // is not exposed on the chart instance. Sync the visible DOM state here.
-                autoBtn.classList.toggle('active', !!chart.autoScale);
-                logBtn.classList.toggle('active', !!chart.logScale);
-                autoBtn.setAttribute('aria-pressed', chart.autoScale ? 'true' : 'false');
-                logBtn.setAttribute('aria-pressed', chart.logScale ? 'true' : 'false');
+                renderScaleModeButtons();
             }
 
-            // Run after FCS's own click handler/UI-manager update has completed.
-            function syncScaleModeStateAfterFcs() {
+            function unlockScaleModesByUserClick() {
+                scaleModesLockedInactive = false;
                 setTimeout(syncScaleModeState, 0);
             }
 
-            autoBtn.addEventListener('click', syncScaleModeStateAfterFcs);
-            logBtn.addEventListener('click', syncScaleModeStateAfterFcs);
+            // Run after FCS's own click handler/UI-manager update has completed.
+            autoBtn.addEventListener('click', unlockScaleModesByUserClick);
+            logBtn.addEventListener('click', unlockScaleModesByUserClick);
 
             // FCS may touch the button classes again during its own UI update.
             // Keep the visible A/L state synchronized with the chart state.
@@ -386,7 +401,9 @@
                 const engine = chart && chart.engine;
                 if (!engine) return;
 
+                scaleModesLockedInactive = true;
                 deactivateScaleModes();
+                renderScaleModeButtons();
 
                 const range = engine.priceRange;
                 if (!range) return;
