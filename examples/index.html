@@ -269,7 +269,17 @@
 
             function syncScaleModeState() {
                 if (scaleModesLockedInactive) {
-                    if (chart.engine) chart.engine.autoScale = false;
+                    if (chart.engine) {
+                        chart.engine.__tradigyScaleModesLockedInactive = true;
+                        chart.engine.autoScale = false;
+                        if (chart.engine.options) chart.engine.options.autoScale = false;
+                        if (chart.engine.uiManager && 'autoScale' in chart.engine.uiManager) {
+                            chart.engine.uiManager.autoScale = false;
+                        }
+                        if (typeof chart.engine.updatePriceScaleButtons === 'function') {
+                            chart.engine.updatePriceScaleButtons();
+                        }
+                    }
                     chart.autoScale = false;
                     chart.logScale = false;
                     renderScaleModeButtons();
@@ -292,12 +302,15 @@
 
             function unlockScaleModesByUserClick() {
                 scaleModesLockedInactive = false;
+                if (chart.engine) {
+                    chart.engine.__tradigyScaleModesLockedInactive = false;
+                }
                 setTimeout(syncScaleModeState, 0);
             }
 
-            // Run after FCS's own click handler/UI-manager update has completed.
-            autoBtn.addEventListener('click', unlockScaleModesByUserClick);
-            logBtn.addEventListener('click', unlockScaleModesByUserClick);
+            // Clear the native lock before FCS handles the direct user click.
+            autoBtn.addEventListener('click', unlockScaleModesByUserClick, true);
+            logBtn.addEventListener('click', unlockScaleModesByUserClick, true);
 
             // FCS may touch the button classes again during its own UI update.
             // Keep the visible A/L state synchronized with the chart state.
@@ -387,7 +400,16 @@
                     chartInstance.toggleAutoScale();
                 }
                 if (chartInstance.engine) {
+                    chartInstance.engine.__tradigyScaleModesLockedInactive =
+                        scaleModesLockedInactive;
                     chartInstance.engine.autoScale = false;
+                    if (chartInstance.engine.options) {
+                        chartInstance.engine.options.autoScale = false;
+                    }
+                    if (chartInstance.engine.uiManager &&
+                        'autoScale' in chartInstance.engine.uiManager) {
+                        chartInstance.engine.uiManager.autoScale = false;
+                    }
                 }
                 chartInstance.autoScale = false;
                 // FCS keeps log-scale state on the chart instance; its
@@ -425,6 +447,9 @@
                 if (!engine) return;
 
                 scaleModesLockedInactive = true;
+                if (chart && chart.engine) {
+                    chart.engine.__tradigyScaleModesLockedInactive = true;
+                }
                 deactivateScaleModes();
                 const autoBtn = chart && chart.priceScaleAutoBtn;
                 const logBtn = chart && chart.priceScaleLogBtn;
